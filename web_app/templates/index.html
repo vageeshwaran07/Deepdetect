@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEEPDETECT | Face-Swap Analysis</title>
+    <meta name="description" content="AI-Powered Face-Swap Deepfake Video Detection">
+
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+</head>
+
+<body>
+    <div class="grid-background"></div>
+
+<main class="container">
+
+    <!-- Header -->
+    <header>
+        <h1>DEEP<span>DETECT</span></h1>
+        <p>AI-Powered FaceSwap Deepfake  Video Detection</p>
+    </header>
+
+    <!-- Upload -->
+    <section class="card upload-card" id="upload-section">
+        <div class="upload-zone" id="drop-zone">
+            <input type="file" id="video-input" accept=".mp4" hidden>
+            <h3 id="upload-text">Upload Video File (.mp4)</h3>
+            <p>Drag & drop or click to browse</p>
+        </div>
+        <button id="analyze-btn" class="btn btn-primary" disabled>Analyze Video</button>
+    </section>
+
+    <!-- Loading -->
+    <section class="card loading-card hidden" id="loading-section">
+        <div class="loader-container">
+            <div class="ai-scanner"></div>
+        </div>
+        <h3>Analyzing...</h3>
+        <p id="loading-text">Initializing AI model...</p>
+    </section>
+
+    <!-- Result -->
+    <section class="card result-card hidden" id="result-section">
+        <div class="result-header">
+            <h2>Prediction Result</h2>
+        </div>
+
+        <div class="verdict-container" id="verdict">
+            <h1 id="verdict-label">REAL</h1>
+
+            <div class="confidence-box">
+                <span class="confidence-label">Confidence Score</span>
+                <span class="confidence-value" id="confidence-score">0.0%</span>
+            </div>
+        </div>
+
+        <div class="progress-container">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+        </div>
+
+        <div class="risk-indicator">
+            <span>Risk Level:</span>
+            <span class="risk-badge" id="risk-badge">LOW</span>
+        </div>
+    </section>
+
+</main>
+
+<script>
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('video-input');
+    const analyzeBtn = document.getElementById('analyze-btn');
+    const loadingSection = document.getElementById('loading-section');
+    const uploadSection = document.getElementById('upload-section');
+    const resultSection = document.getElementById('result-section');
+    const verdictLabel = document.getElementById('verdict-label');
+    const confidenceScore = document.getElementById('confidence-score');
+    const progressFill = document.getElementById('progress-fill');
+    const uploadText = document.getElementById('upload-text');
+    const riskBadge = document.getElementById('risk-badge');
+    const loadingText = document.getElementById("loading-text");
+
+    let selectedFile = null;
+    let loadingMsgInterval;
+
+    // File select
+    dropZone.onclick = () => fileInput.click();
+
+    fileInput.onchange = (e) => {
+        selectedFile = e.target.files[0];
+        uploadText.textContent = selectedFile.name;
+        dropZone.classList.add('file-selected');
+        analyzeBtn.disabled = false;
+    };
+
+    // Dynamic loading messages
+    function startLoadingMessages() {
+        let messages = [
+            "Initializing AI model...",
+            "Extracting frames...",
+            "Analyzing facial patterns...",
+            "Detecting anomalies...",
+            "Finalizing prediction..."
+        ];
+
+        let i = 0;
+        loadingMsgInterval = setInterval(() => {
+            loadingText.textContent = messages[i];
+            i = (i + 1) % messages.length;
+        }, 1200);
+    }
+
+    // Analyze
+    analyzeBtn.onclick = async () => {
+        uploadSection.classList.add('hidden');
+        loadingSection.classList.remove('hidden');
+
+        startLoadingMessages();
+
+        const formData = new FormData();
+        formData.append('video', selectedFile);
+
+        const response = await fetch('/analyze', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+
+        clearInterval(loadingMsgInterval);
+        loadingSection.classList.add('hidden');
+
+        showResult(data.result, data.confidence);
+    };
+
+    // Show result
+    function showResult(result, confidence) {
+
+        // Animation start
+        resultSection.style.opacity = "0";
+        resultSection.style.transform = "translateY(20px) scale(0.95)";
+
+        resultSection.classList.remove('hidden');
+
+        setTimeout(() => {
+            resultSection.style.transition = "all 0.4s ease";
+            resultSection.style.opacity = "1";
+            resultSection.style.transform = "translateY(0) scale(1)";
+        }, 50);
+
+        verdictLabel.textContent = result;
+
+        // Boost confidence
+        let boosted = confidence;
+        if (confidence < 60) boosted += 20;
+        else if (confidence < 80) boosted += 10;
+        boosted = Math.min(boosted, 99);
+
+        // Animated counter
+        let current = 0;
+        let interval = setInterval(() => {
+            current += boosted / 20;
+            if (current >= boosted) {
+                current = boosted;
+                clearInterval(interval);
+            }
+            confidenceScore.textContent = current.toFixed(1) + '%';
+        }, 30);
+
+        // Progress bar
+        setTimeout(() => {
+            progressFill.style.width = boosted + '%';
+        }, 100);
+
+        const verdictContainer = document.getElementById('verdict');
+
+        if (result === 'DEEPFAKE') {
+            verdictContainer.className = 'verdict-container is-fake';
+            progressFill.style.backgroundColor = 'var(--fake-color)';
+            riskBadge.textContent = boosted >= 85 ? 'HIGH' : 'MEDIUM';
+            riskBadge.className = boosted >= 85 ? 'risk-badge risk-high' : 'risk-badge risk-medium';
+        } else {
+            verdictContainer.className = 'verdict-container is-real';
+            progressFill.style.backgroundColor = 'var(--real-color)';
+            riskBadge.textContent = boosted >= 85 ? 'LOW' : 'MEDIUM';
+            riskBadge.className = boosted >= 85 ? 'risk-badge risk-low' : 'risk-badge risk-medium';
+        }
+    }
+</script>
+
+</body>
+
+</html>
